@@ -4,6 +4,7 @@
 # Purpose: Load data from CSV files into distributed tables
 
 set -euo pipefail
+IFS=$' \n\t'
 
 # Colors
 RED='\033[0;31m'
@@ -23,6 +24,7 @@ CSV_DIR="$CONFIG_DIR/csv"
 SCENARIOS_DIR="$CONFIG_DIR/scenarios"
 COORDINATOR_CONTAINER=""  # Will be detected dynamically
 DATABASE_NAME=""  # Will be detected dynamically (citus_platform or citus)
+TABLES_CONFIG="$CONFIG_DIR/tables.yml"
 
 # Function for formatted logging
 log() {
@@ -37,6 +39,30 @@ log() {
         "WARNING") echo -e "${YELLOW}[$timestamp] WARNING: $message${NC}" ;;
         "ERROR") echo -e "${RED}[$timestamp] ERROR: $message${NC}" ;;
     esac
+}
+
+# Function to parse YAML configuration file (scenario)
+parse_yaml_config() {
+    local config_file="$1"
+    
+    # Check if file exists
+    if [[ ! -f "$config_file" ]]; then
+        return 0
+    fi
+
+    # Check if there's a table import
+    local import_file=$(yq -r '.import // ""' "$config_file")
+    if [[ -n "$import_file" && "$import_file" != "null" ]]; then
+        # Resolve relative path based on config file directory
+        local base_dir=$(dirname "$config_file")
+        import_file="$base_dir/$import_file"
+        if [[ ! -f "$import_file" ]]; then
+            import_file="$CONFIG_DIR/tables.yml"  # Fallback
+        fi
+        TABLES_CONFIG="$import_file"
+    else
+        TABLES_CONFIG="$config_file"
+    fi
 }
 
 # Function to detect active architecture
@@ -158,14 +184,14 @@ check_cluster() {
 
 # Function to list available tables
 list_tables() {
-    log "INFO" "Available tables in tables.yml:"
+    log "INFO" "Available tables in $TABLES_CONFIG:"
     echo
     
-    yq eval '.tables | keys' config/tables.yml | grep '^-' | sed 's/^- //' | while read -r table; do
+    yq -r '.tables | keys_unsorted | .[]' "$TABLES_CONFIG" | while read -r table; do
         if [[ "$table" != "null" && "$table" != "---" ]]; then
             local table_name=$(echo "$table" | sed 's/^- //')
-            local table_type=$(yq eval ".tables.\"$table_name\".type" config/tables.yml)
-            local shard_column=$(yq eval ".tables.\"$table_name\".distribution.column" config/tables.yml)
+            local table_type=$(yq -r ".tables.\"$table_name\".type" "$TABLES_CONFIG")
+            local shard_column=$(yq -r ".tables.\"$table_name\".distribution.column" "$TABLES_CONFIG")
             
             echo -e "  ${BOLD}$table_name${NC} (${table_type})"
             if [[ "$shard_column" != "null" ]]; then
@@ -211,7 +237,7 @@ validate_csv_structure() {
     log "INFO" "Header found: $csv_header"
     
     # Get expected columns from configuration
-    local expected_columns=$(yq eval ".tables.\"$table_name\".columns | keys | join(\", \")" config/tables.yml)
+    local expected_columns=$(yq -r ".tables.\"$table_name\".columns | map(.name) | join(\", \")" "$TABLES_CONFIG")
     log "INFO" "Expected columns: $expected_columns"
     
     # Count data lines (excluding header)
@@ -273,10 +299,10 @@ load_all_data() {
         return 1
     fi
     
-    # For each CSV found, try to load into corresponding table
-    for csv_file in "$CSV_DIR"/*.csv; do
-        if [[ -f "$csv_file" ]]; then
-            local table_name=$(basename "$csv_file" .csv)
+    # Load data following the order of tables in configuration
+    local tables=$(yq -r '.tables | keys_unsorted | .[]' "$TABLES_CONFIG")
+    for table_name in $tables; do
+        if [[ -n "$table_name" && -f "$CSV_DIR/${table_name}.csv" ]]; then
             log "INFO" "Processing table: $table_name"
             load_table_data "$table_name"
         fi
@@ -294,17 +320,20 @@ load_scenario_data() {
     
     log "INFO" "Loading data from scenario: $scenario"
     
+    # Parse configuration to set TABLES_CONFIG correctly
+    parse_yaml_config "$SCENARIOS_DIR/${scenario}.yml"
+    
     # List available CSV files
     if [[ ! -d "$CSV_DIR" ]]; then
         log "WARNING" "CSV directory not found: $CSV_DIR"
         return 1
     fi
     
-    # For each CSV found, try to load into corresponding table
+    # Load data following the order of tables in configuration
     local loaded_count=0
-    for csv_file in "$CSV_DIR"/*.csv; do
-        if [[ -f "$csv_file" ]]; then
-            local table_name=$(basename "$csv_file" .csv)
+    local tables=$(yq -r '.tables | keys_unsorted | .[]' "$TABLES_CONFIG")
+    for table_name in $tables; do
+        if [[ -n "$table_name" && -f "$CSV_DIR/${table_name}.csv" ]]; then
             log "INFO" "Processing table: $table_name"
             if load_table_data "$table_name"; then
                 loaded_count=$((loaded_count + 1))
@@ -348,7 +377,7 @@ list_csv_files() {
             echo -e "    └─ Lines: $line_count"
             echo
             
-            ((csv_count++))
+            csv_count=$((csv_count + 1))
         fi
     done
     

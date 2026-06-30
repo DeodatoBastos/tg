@@ -4,6 +4,7 @@
 # Purpose: Create tables and configure sharding based on YAML files
 
 set -euo pipefail
+IFS=$' \n\t'
 
 # Colors
 RED='\033[0;31m'
@@ -27,7 +28,7 @@ log() {
     shift
     local message="$*"
     local timestamp=$(date '+%H:%M:%S')
-    
+
     case $level in
         "INFO")  echo -e "${CYAN}[$timestamp] INFO: $message${NC}" ;;
         "SUCCESS") echo -e "${GREEN}[$timestamp] SUCCESS: $message${NC}" ;;
@@ -53,7 +54,7 @@ detect_architecture() {
 # Function to detect coordinator based on architecture
 detect_coordinator() {
     local arch=$(detect_architecture)
-    
+
     case $arch in
         "patroni")
             detect_patroni_leader
@@ -71,11 +72,11 @@ detect_coordinator() {
 # Function to detect Patroni leader coordinator via API
 detect_patroni_leader() {
     log "INFO" "Detecting leader coordinator (Patroni)..."
-    
-    # Try to detect leader for up to 1 minute 
+
+    # Try to detect leader for up to 1 minute
     local max_attempts=120  # 60 seconds (120 * 0.5s)
     local attempt=0
-    
+
     while [ $attempt -lt $max_attempts ]; do
         # Check for leader using multiple methods
         for coord in coordinator1 coordinator2 coordinator3; do
@@ -93,7 +94,7 @@ detect_patroni_leader() {
                 log "SUCCESS" "Leader coordinator detected: $coord"
                 return 0
             fi
-            
+
             # Method 2: Direct PostgreSQL check for master/replica status
             if docker exec "$container_name" pg_isready -U postgres >/dev/null 2>&1; then
                 postgres_role=$(docker exec "$container_name" psql -U postgres -t -c "SELECT CASE WHEN pg_is_in_recovery() THEN 'replica' ELSE 'master' END;" 2>/dev/null | tr -d ' ')
@@ -104,7 +105,7 @@ detect_patroni_leader() {
                 fi
             fi
         done
-        
+
         sleep 0.5
         attempt=$((attempt + 1))
     done
@@ -117,7 +118,7 @@ detect_patroni_leader() {
 # Function to detect simple coordinator
 detect_simple_coordinator() {
     log "INFO" "Detecting coordinator (Simple Architecture)..."
-    
+
     if docker ps --format "{{.Names}}" | grep -q "^citus_coordinator$"; then
         COORDINATOR_CONTAINER="citus_coordinator"
         log "SUCCESS" "Coordinator detected: citus_coordinator"
@@ -131,12 +132,12 @@ detect_simple_coordinator() {
 # Function to check dependencies
 check_dependencies() {
     log "INFO" "Checking dependencies..."
-    
+
     # Check if yq is installed (for YAML parsing)
     if ! command -v yq &> /dev/null; then
         log "WARNING" "yq not found. Attempting to install..."
-        if command -v brew &> /dev/null; then
-            brew install yq
+        if command -v apt &> /dev/null; then
+            sudo apt install yq -y
         else
             log "ERROR" "Please install yq: https://github.com/mikefarah/yq"
             log "INFO" "macOS: brew install yq"
@@ -144,22 +145,22 @@ check_dependencies() {
             return 1
         fi
     fi
-    
+
     # Check Docker
     if ! docker ps > /dev/null 2>&1; then
         log "ERROR" "Docker is not running or not accessible"
         return 1
     fi
-    
+
     # Detect and verify coordinator based on architecture
     detect_coordinator || return 1
-    
+
     # Check if cluster is running
     if ! docker exec "$COORDINATOR_CONTAINER" pg_isready -U postgres > /dev/null 2>&1; then
         log "ERROR" "Citus cluster is not running or leader coordinator is not accessible"
         return 1
     fi
-    
+
     log "SUCCESS" "All dependencies verified"
 }
 
@@ -167,20 +168,20 @@ check_dependencies() {
 list_scenarios() {
     log "INFO" "Available scenarios:"
     echo
-    
+
     for scenario_file in "$SCENARIOS_DIR"/*.yml; do
         if [[ -f "$scenario_file" ]]; then
             local scenario_name=$(basename "$scenario_file" .yml)
-            local description=$(yq eval '.scenario.description // "No description"' "$scenario_file")
-            local complexity=$(yq eval '.scenario.complexity // "unknown"' "$scenario_file")
-            
+            local description=$(yq -r '.scenario.description // "No description"' "$scenario_file")
+            local complexity=$(yq -r '.scenario.complexity // "unknown"' "$scenario_file")
+
             case $complexity in
                 "beginner") complexity_level="[BASIC]" ;;
                 "intermediate") complexity_level="[INTERMEDIATE]" ;;
                 "advanced") complexity_level="[ADVANCED]" ;;
                 *) complexity_level="[UNKNOWN]" ;;
             esac
-            
+
             echo -e "  ${complexity_level} ${BOLD}${scenario_name}${NC}: $description"
         fi
     done
@@ -190,24 +191,25 @@ list_scenarios() {
 # Function to parse YAML configuration file
 parse_yaml_config() {
     local config_file="$1"
-    
+
     log "INFO" "Parsing configuration: $config_file"
-    
+
     # Check if file exists
     if [[ ! -f "$config_file" ]]; then
         log "ERROR" "Configuration file not found: $config_file"
         return 1
     fi
-    
+
     # Extract database name
-    DB_NAME=$(yq eval '.database.name // "test_db"' "$config_file")
+    DB_NAME=$(yq -r '.database.name // "test_db"' "$config_file")
     log "DEBUG" "Database: $DB_NAME"
-    
+
     # Check if there's a table import
-    local import_file=$(yq eval '.import // ""' "$config_file")
+    local import_file=$(yq -r '.import // ""' "$config_file")
     if [[ -n "$import_file" && "$import_file" != "null" ]]; then
-        # Resolve relative path
-        import_file="$CONFIG_DIR/$import_file"
+        # Resolve relative path based on config file directory
+        local base_dir=$(dirname "$config_file")
+        import_file="$base_dir/$import_file"
         if [[ ! -f "$import_file" ]]; then
             import_file="$CONFIG_DIR/tables.yml"  # Fallback
         fi
@@ -221,9 +223,9 @@ parse_yaml_config() {
 # Function to create database
 create_database() {
     local db_name="$1"
-    
+
     log "INFO" "Checking database: $db_name"
-    
+
     # Check if database already exists
     if docker exec "$COORDINATOR_CONTAINER" psql -U postgres -lqt | cut -d \| -f 1 | grep -qw "$db_name"; then
         log "INFO" "Database '$db_name' already exists. Reusing..."
@@ -231,10 +233,10 @@ create_database() {
         log "INFO" "Creating database: $db_name"
         docker exec "$COORDINATOR_CONTAINER" psql -U postgres -c "CREATE DATABASE $db_name;"
     fi
-    
+
     # Create Citus extension (if it doesn't exist)
     docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$db_name" -c "CREATE EXTENSION IF NOT EXISTS citus;"
-    
+
     log "SUCCESS" "Database '$db_name' ready with Citus extension"
 }
 
@@ -242,57 +244,57 @@ create_database() {
 create_table() {
     local table_name="$1"
     local config_file="$2"
-    
+
     log "INFO" "Creating table: $table_name"
-    
+
     # Check if table already exists
     if docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "\dt" | grep -qw "$table_name"; then
         log "WARNING" "Table '$table_name' already exists. Skipping creation..."
         return 0
     fi
-    
+
     # Extract table configuration
-    local table_type=$(yq eval ".tables.${table_name}.type" "$config_file")
-    local description=$(yq eval ".tables.${table_name}.description" "$config_file")
-    
+    local table_type=$(yq -r ".tables.${table_name}.type" "$config_file")
+    local description=$(yq -r ".tables.${table_name}.description" "$config_file")
+
     log "DEBUG" "Type: $table_type | Description: $description"
-    
+
     # Build DDL
     local ddl="CREATE TABLE $table_name ("
-    
+
     # Add columns
-    local columns_count=$(yq eval ".tables.${table_name}.columns | length" "$config_file")
+    local columns_count=$(yq -r ".tables.${table_name}.columns | length" "$config_file")
     for ((i=0; i<columns_count; i++)); do
-        local col_name=$(yq eval ".tables.${table_name}.columns[$i].name" "$config_file")
-        local col_type=$(yq eval ".tables.${table_name}.columns[$i].type" "$config_file")
-        local col_desc=$(yq eval ".tables.${table_name}.columns[$i].description // \"\"" "$config_file")
-        
+        local col_name=$(yq -r ".tables.${table_name}.columns[$i].name" "$config_file")
+        local col_type=$(yq -r ".tables.${table_name}.columns[$i].type" "$config_file")
+        local col_desc=$(yq -r ".tables.${table_name}.columns[$i].description // \"\"" "$config_file")
+
         ddl="$ddl\n    $col_name $col_type"
         [[ $i -lt $((columns_count-1)) ]] && ddl="$ddl,"
-        
+
         log "DEBUG" "  Column: $col_name ($col_type)"
     done
-    
+
     # Check for custom primary key
-    local pk=$(yq eval ".tables.${table_name}.primary_key // []" "$config_file")
+    local pk=$(yq -r ".tables.${table_name}.primary_key // []" "$config_file")
     if [[ "$pk" != "[]" && "$pk" != "null" ]]; then
-        local pk_cols=$(yq eval ".tables.${table_name}.primary_key | join(\", \")" "$config_file")
+        local pk_cols=$(yq -r ".tables.${table_name}.primary_key | join(\", \")" "$config_file")
         ddl="$ddl,\n    PRIMARY KEY ($pk_cols)"
         log "DEBUG" "  Primary key: $pk_cols"
     fi
-    
+
     ddl="$ddl\n);"
-    
+
     # Execute DDL
     log "DEBUG" "Executing DDL for $table_name"
     echo -e "$ddl" | docker exec -i "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME"
-    
+
     # Configure distribution
     configure_table_distribution "$table_name" "$config_file"
-    
+
     # Create indexes
     create_table_indexes "$table_name" "$config_file"
-    
+
     log "SUCCESS" "Table '$table_name' created successfully"
 }
 
@@ -300,23 +302,23 @@ create_table() {
 configure_table_distribution() {
     local table_name="$1"
     local config_file="$2"
-    
-    local table_type=$(yq eval ".tables.${table_name}.type" "$config_file")
-    
+
+    local table_type=$(yq -r ".tables.${table_name}.type" "$config_file")
+
     case $table_type in
         "reference")
             log "INFO" "Configuring '$table_name' as reference table"
             docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" \
                 -c "SELECT create_reference_table('$table_name');"
             ;;
-            
+
         "distributed")
-            local shard_key=$(yq eval ".tables.${table_name}.shard_key" "$config_file")
-            local shard_count=$(yq eval ".tables.${table_name}.shard_count // 4" "$config_file")
-            
+            local shard_key=$(yq -r ".tables.${table_name}.shard_key" "$config_file")
+            local shard_count=$(yq -r ".tables.${table_name}.shard_count // 4" "$config_file")
+
             # Check for co-location before creating
-            local colocated_with=$(yq eval ".tables.${table_name}.colocated_with // \"\"" "$config_file")
-            
+            local colocated_with=$(yq -r ".tables.${table_name}.colocated_with // \"\"" "$config_file")
+
             if [[ -n "$colocated_with" && "$colocated_with" != "null" ]]; then
                 log "INFO" "Configuring '$table_name' as distributed table co-located with '$colocated_with'"
                 docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" \
@@ -327,11 +329,11 @@ configure_table_distribution() {
                     -c "SELECT create_distributed_table('$table_name', '$shard_key', shard_count => $shard_count);"
             fi
             ;;
-            
+
         "local")
             log "INFO" "Keeping '$table_name' as local table (not distributed)"
             ;;
-            
+
         *)
             log "WARNING" "Unknown table type: $table_type. Keeping as local"
             ;;
@@ -342,18 +344,18 @@ configure_table_distribution() {
 create_table_indexes() {
     local table_name="$1"
     local config_file="$2"
-    
-    local indexes_count=$(yq eval ".tables.${table_name}.indexes | length" "$config_file" 2>/dev/null || echo "0")
-    
+
+    local indexes_count=$(yq -r ".tables.${table_name}.indexes | length" "$config_file" 2>/dev/null || echo "0")
+
     if [[ "$indexes_count" -gt 0 ]]; then
         log "INFO" "Creating indexes for '$table_name'"
-        
+
         for ((i=0; i<indexes_count; i++)); do
-            local idx_name=$(yq eval ".tables.${table_name}.indexes[$i].name" "$config_file")
-            local idx_columns=$(yq eval ".tables.${table_name}.indexes[$i].columns | join(\", \")" "$config_file")
-            
+            local idx_name=$(yq -r ".tables.${table_name}.indexes[$i].name" "$config_file")
+            local idx_columns=$(yq -r ".tables.${table_name}.indexes[$i].columns | join(\", \")" "$config_file")
+
             log "DEBUG" "  Index: $idx_name ($idx_columns)"
-            
+
             docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" \
                 -c "CREATE INDEX IF NOT EXISTS $idx_name ON $table_name ($idx_columns);"
         done
@@ -364,75 +366,75 @@ create_table_indexes() {
 create_schema() {
     local scenario="$1"
     local config_file="$SCENARIOS_DIR/${scenario}.yml"
-    
+
     log "INFO" "Starting schema creation for scenario: $scenario"
-    
+
     # Check dependencies
     check_dependencies || return 1
-    
+
     # Parse configuration
     parse_yaml_config "$config_file" || return 1
-    
+
     # Create database
     create_database "$DB_NAME"
-    
+
     # Get table list in correct order
-    local tables=$(yq eval '.tables | keys | .[]' "$TABLES_CONFIG")
-    
+    local tables=$(yq -r '.tables | keys_unsorted | .[]' "$TABLES_CONFIG")
+
     log "INFO" "Tables to be created: $(echo $tables | tr '\n' ' ')"
-    
+
     # Create tables in order (reference first, then distributed)
     echo "$tables" | while read -r table; do
         [[ -n "$table" && "$table" != "null" ]] && create_table "$table" "$TABLES_CONFIG"
     done
-    
+
     # Show final summary
     show_schema_summary
-    
+
     log "SUCCESS" "Schema created successfully"
 }
 
 # Function to show schema summary
 show_schema_summary() {
     log "INFO" "Schema Summary"
-    
+
     echo -e "\n${CYAN}Created tables:${NC}"
     docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "
-    SELECT 
+    SELECT
         schemaname,
         tablename,
-        CASE 
+        CASE
             WHEN tablename IN (SELECT logicalrelid::regclass::text FROM pg_dist_partition WHERE partmethod = 'n')
             THEN 'Reference'
             WHEN tablename IN (SELECT logicalrelid::regclass::text FROM pg_dist_partition WHERE partmethod = 'h')
             THEN 'Distributed'
             ELSE 'Local'
         END as type
-    FROM pg_tables 
-    WHERE schemaname = 'public' 
+    FROM pg_tables
+    WHERE schemaname = 'public'
       AND tablename NOT LIKE 'pgbench_%'
-    ORDER BY 
-        CASE 
+    ORDER BY
+        CASE
             WHEN tablename IN (SELECT logicalrelid::regclass::text FROM pg_dist_partition WHERE partmethod = 'n') THEN 1
             WHEN tablename IN (SELECT logicalrelid::regclass::text FROM pg_dist_partition WHERE partmethod = 'h') THEN 2
             ELSE 3
         END, tablename;
     "
-    
+
     echo -e "\n${CYAN}Shard distribution:${NC}"
     docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "
-    SELECT 
+    SELECT
         p.logicalrelid::regclass as table_name,
-        CASE 
+        CASE
             WHEN p.partmethod = 'n' THEN 'Reference Table'
             ELSE COUNT(s.shardid)::text
         END as shards,
-        CASE 
+        CASE
             WHEN p.partmethod = 'n' THEN 'N/A'
             WHEN p.partmethod = 'h' THEN 'company_id'
             ELSE 'Unknown'
         END as shard_key,
-        CASE 
+        CASE
             WHEN p.partmethod = 'n' THEN 'Reference'
             WHEN p.partmethod = 'h' THEN 'Hash Distributed'
             ELSE 'Unknown'
@@ -442,7 +444,7 @@ show_schema_summary() {
     LEFT JOIN pg_dist_shard s ON s.logicalrelid = p.logicalrelid
     WHERE p.logicalrelid::regclass::text NOT LIKE 'pgbench_%'
     GROUP BY p.logicalrelid, p.partkey, p.partmethod, p.colocationid
-    ORDER BY 
+    ORDER BY
         CASE p.partmethod WHEN 'n' THEN 1 WHEN 'h' THEN 2 ELSE 3 END,
         p.logicalrelid::regclass;
     " 2>/dev/null || echo -e "    ${YELLOW}No Citus distributed tables found${NC}"
@@ -451,10 +453,10 @@ show_schema_summary() {
 # Function to clean schema (drop all user tables)
 clean_schema() {
     log "INFO" "Schema cleanup - removing all user tables"
-    
+
     # Check dependencies
     check_dependencies || return 1
-    
+
     # Detect database name (try citus_platform first, then citus)
     if docker exec "$COORDINATOR_CONTAINER" psql -U postgres -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "citus_platform"; then
         DB_NAME="citus_platform"
@@ -464,39 +466,39 @@ clean_schema() {
         log "ERROR" "Cannot find Citus database (citus_platform or citus)"
         return 1
     fi
-    
+
     log "INFO" "Using database: $DB_NAME"
-    
+
     echo -e "${YELLOW}WARNING: This will drop all user tables in database '$DB_NAME'${NC}"
     echo -e "${YELLOW}Tables to be dropped:${NC}"
-    
+
     # Show tables that will be dropped
     docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "
-    SELECT tablename FROM pg_tables 
-    WHERE schemaname = 'public' 
-    AND tablename NOT LIKE 'pg_%' 
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+    AND tablename NOT LIKE 'pg_%'
     AND tablename NOT LIKE 'citus_%'
     ORDER BY tablename;
     "
-    
+
     echo
     echo -n -e "${CYAN}Do you want to continue? [y/N]: ${NC}"
     read -r confirm
-    
+
     if [[ $confirm =~ ^[Yy]$ ]]; then
         log "INFO" "Dropping all user tables..."
-        
+
         # Drop all user tables (this handles distributed, reference, and local tables)
         docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "
         DO \$\$
         DECLARE
             rec RECORD;
         BEGIN
-            FOR rec IN 
-                SELECT tablename 
-                FROM pg_tables 
-                WHERE schemaname = 'public' 
-                AND tablename NOT LIKE 'pg_%' 
+            FOR rec IN
+                SELECT tablename
+                FROM pg_tables
+                WHERE schemaname = 'public'
+                AND tablename NOT LIKE 'pg_%'
                 AND tablename NOT LIKE 'citus_%'
             LOOP
                 EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(rec.tablename) || ' CASCADE';
@@ -505,7 +507,7 @@ clean_schema() {
         END
         \$\$;
         "
-        
+
         log "SUCCESS" "All user tables dropped successfully"
     else
         log "INFO" "Schema cleanup cancelled"
@@ -519,7 +521,7 @@ interactive_mode() {
         echo -e "${PURPLE}           INTERACTIVE SCHEMA MANAGER               ${NC}"
         echo -e "${PURPLE}=====================================================${NC}"
         echo
-        
+
         echo -e "${BOLD}Available options:${NC}"
         echo
         echo -e "  ${CYAN}1${NC} - List available scenarios"
@@ -528,10 +530,10 @@ interactive_mode() {
         echo -e "  ${CYAN}4${NC} - Clean schema (drop all tables)"
         echo -e "  ${CYAN}0${NC} - Return to main menu"
         echo
-        
+
         echo -n -e "${CYAN}Choose an option [0-4]: ${NC}"
         read -r choice
-        
+
         case $choice in
             1)
                 list_scenarios
@@ -543,7 +545,7 @@ interactive_mode() {
                 list_scenarios
                 echo -n -e "${CYAN}Choose a scenario to create: ${NC}"
                 read -r scenario
-                
+
                 if [[ -f "$SCENARIOS_DIR/${scenario}.yml" ]]; then
                     create_schema "$scenario"
                     echo "Press Enter to continue..."

@@ -20,6 +20,7 @@ RUN apt-get update \
         net-tools iputils-ping dumb-init \
         build-essential libpq-dev \
     && pip3 install --break-system-packages \
+        ydiff==1.2 \
         patroni[etcd3]==3.2.2 \
         psycopg2-binary \
     && apt-get clean \

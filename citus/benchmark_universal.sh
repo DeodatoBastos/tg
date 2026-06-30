@@ -18,14 +18,19 @@
 # ===================================================================
 
 set -euo pipefail
-IFS=$'\n\t'
+IFS=$' \n\t'
 
 # ===================================================================
 # CONFIGURAÇÕES GLOBAIS
 # ===================================================================
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly COMPOSE_CMD="${COMPOSE_CMD:-docker-compose}"
+if docker compose version &>/dev/null; then
+    COMPOSE_CMD_DEFAULT="docker compose"
+else
+    COMPOSE_CMD_DEFAULT="docker-compose"
+fi
+readonly COMPOSE_CMD="${COMPOSE_CMD:-$COMPOSE_CMD_DEFAULT}"
 readonly TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 
 # Configurações de Banco (serão detectadas automaticamente)
@@ -140,7 +145,7 @@ check_dependencies() {
         exit 1
     fi
     
-    if ! command -v "$COMPOSE_CMD" &> /dev/null; then
+    if ! $COMPOSE_CMD version &> /dev/null; then
         log "ERROR" "Docker Compose não encontrado: $COMPOSE_CMD"
         exit 1
     fi
@@ -398,7 +403,7 @@ check_database_connection() {
         
         log "INFO" "Tentativa $attempt/$max_attempts - Aguardando $DB_TYPE..."
         sleep 2
-        ((attempt++))
+        attempt=$((attempt + 1))
     done
     
     log "ERROR" "$DB_TYPE não respondeu após $max_attempts tentativas"
@@ -1097,10 +1102,10 @@ run_benchmark_suite() {
                 log "INFO" "Progresso: $progress - Run $run..."
                 
                 if run_benchmark_test "$suite" "$clients" "$jobs" "$run"; then
-                    ((completed_tests++))
+                    completed_tests=$((completed_tests + 1))
                     log "SUCCESS" "Run $run concluído ($progress)"
                 else
-                    ((failed_tests++))
+                    failed_tests=$((failed_tests + 1))
                     log "ERROR" "Run $run falhou ($progress)"
                 fi
                 

@@ -46,7 +46,7 @@ echo -e "${BLUE}🧹 STEP 1: Cleanup${NC}"
 echo "═══════════════════════"
 
 log_step "Stopping old containers..."
-docker-compose down -v 2>/dev/null || true
+docker compose down -v 2>/dev/null || true
 
 log_step "Cleaning orphaned volumes..."
 docker volume prune -f
@@ -59,8 +59,11 @@ export COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME"
 export POSTGRES_PASSWORD="$POSTGRES_PASSWORD"
 export POSTGRES_USER="postgres"
 
+log_step "Building custom Citus Patroni image..."
+docker build -t citus-patroni:latest -f Dockerfile.citus-patroni .
+
 log_step "Starting containers with Patroni..."
-docker-compose -f docker-compose-patroni.yml up -d
+docker compose -f docker-compose-patroni.yml up -d
 
 
 

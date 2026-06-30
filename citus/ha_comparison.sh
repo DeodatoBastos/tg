@@ -9,6 +9,7 @@
 # =============================================================================
 
 set -euo pipefail
+IFS=$' \n\t'
 
 # =============================================================================
 # CONFIGURATION & CONSTANTS
@@ -246,7 +247,7 @@ wait_for_leader_election() {
                     return 0
                 fi
                 sleep 1
-                ((attempts++))
+                attempts=$((attempts + 1))
             done
             
             log "WARN" "New leader elected but not yet ready for queries"
@@ -581,7 +582,7 @@ demonstrate_standard_limitations() {
     local attempts=0
     while ! container_healthy "$STANDARD_COORDINATOR" && [[ $attempts -lt 30 ]]; do
         sleep 2
-        ((attempts++))
+        attempts=$((attempts + 1))
     done
     show_standard_topology
     test_query "standard" "$STANDARD_COORDINATOR" "$STANDARD_DB" "Query after coordinator recovery"
@@ -629,9 +630,9 @@ check_patroni_cluster_health() {
     local total_coordinators=0
     
     for coord in "$PATRONI_COORDINATOR1" "$PATRONI_COORDINATOR2" "$PATRONI_COORDINATOR3"; do
-        ((total_coordinators++))
+        total_coordinators=$((total_coordinators + 1))
         if container_healthy "$coord"; then
-            ((healthy_coordinators++))
+            healthy_coordinators=$((healthy_coordinators + 1))
             log "SUCCESS" "Coordinator $coord is healthy"
         else
             log "WARN" "Coordinator $coord is not healthy"
@@ -1319,7 +1320,7 @@ show_menu() {
             echo -e "${RED}❌ NO ACTIVE CLUSTER DETECTED${NC}"
             echo
             echo -e "${YELLOW}Please start a Citus cluster first:${NC}"
-            echo -e "${YELLOW}   Standard: docker-compose up -d${NC}"
+            echo -e "${YELLOW}   Standard: docker compose up -d${NC}"
             echo -e "${YELLOW}   Patroni:   ./simple_setup.sh${NC}"
             echo
             echo -e "${RED}1)${NC} Exit"

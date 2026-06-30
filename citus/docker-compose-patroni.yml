@@ -54,7 +54,7 @@ services:
     container_name: citus_haproxy
     hostname: haproxy
     ports:
-      - "5432:5000"  # Acesso ao coordinator primary
+      - "5440:5000"  # Acesso ao coordinator primary
       - "8008:8008"  # Patroni REST API
     command: haproxy
     environment: &base_env
