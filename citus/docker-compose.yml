@@ -10,6 +10,7 @@ volumes:
   citus_worker1_data:
   citus_worker2_data:
   citus_grafana_data:
+
 services:
   # ═══════════════════════════════════════════════════════════════
   # COORDINATOR 

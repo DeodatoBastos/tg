@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Setup script for Citus cluster with Patroni 
+# Setup script for Citus cluster with Patroni
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ DB_NAME="citus_platform"
 # The "primary" containers are actually the replicas (pg_is_in_recovery = true)
 WORKER1_PRIMARY_CONTAINER="citus_worker1_primary"  # Actually the primary
 WORKER1_STANDBY_CONTAINER="citus_worker1_standby"  # Actually the standby
-WORKER2_PRIMARY_CONTAINER="citus_worker2_primary"  # Actually the primary  
+WORKER2_PRIMARY_CONTAINER="citus_worker2_primary"  # Actually the primary
 WORKER2_STANDBY_CONTAINER="citus_worker2_standby"  # Actually the standby
 
 
@@ -70,11 +70,11 @@ docker compose -f docker-compose-patroni.yml up -d
 # Function to detect leader coordinator
 detect_leader_coordinator() {
     echo -e "${CYAN}🔍 Detecting leader coordinator...${NC}"
-    
+
     # Try to detect leader for up to 2 minutes (PostgreSQL initialization may take time)
     local max_attempts=240  # 120 seconds (240 * 0.5s)
     local attempt=0
-    
+
     while [ $attempt -lt $max_attempts ]; do
         # Check for leader using multiple methods
         for coord in coordinator1 coordinator2 coordinator3; do
@@ -92,7 +92,7 @@ detect_leader_coordinator() {
                 echo -e "${GREEN}✅ Leader detected: $coord${NC}"
                 return 0
             fi
-            
+
             # Method 2: Direct PostgreSQL check for master/replica status
             if docker exec "$container_name" pg_isready -U postgres >/dev/null 2>&1; then
                 postgres_role=$(docker exec "$container_name" psql -U postgres -t -c "SELECT CASE WHEN pg_is_in_recovery() THEN 'replica' ELSE 'master' END;" 2>/dev/null | tr -d ' ')
@@ -103,7 +103,7 @@ detect_leader_coordinator() {
                 fi
             fi
         done
-        
+
         # Show progress
         if [ $((attempt % 10)) -eq 0 ] && [ $attempt -gt 0 ]; then
             echo -n " [${attempt}s]"
@@ -115,7 +115,7 @@ detect_leader_coordinator() {
     done
 
     echo -e "\n${YELLOW}⚠️ Could not detect leader automatically.${NC}"
-    
+
     # Fallback: attempt to find any responsive coordinator
     echo -e "${CYAN}Trying to find any working coordinator...${NC}"
     for coord in coordinator1 coordinator2 coordinator3; do
@@ -131,7 +131,7 @@ detect_leader_coordinator() {
             fi
         fi
     done
-    
+
     echo -e "${YELLOW}Using coordinator1 as fallback${NC}"
     COORDINATOR_CONTAINER="citus_coordinator1"
     return 1
@@ -177,7 +177,7 @@ leader_found=""
 if docker logs citus_coordinator1 --tail 1 2>/dev/null | grep -q "leader with the lock"; then
     leader_found="coordinator1"
 elif docker logs citus_coordinator2 --tail 1 2>/dev/null | grep -q "leader with the lock"; then
-    leader_found="coordinator2"  
+    leader_found="coordinator2"
 elif docker logs citus_coordinator3 --tail 1 2>/dev/null | grep -q "leader with the lock"; then
     leader_found="coordinator3"
 fi
@@ -197,7 +197,7 @@ else
             fi
             sleep 0.5
         done
-        
+
         if ! docker exec "$COORDINATOR_CONTAINER" pg_isready -U postgres > /dev/null 2>&1; then
             echo -e "${YELLOW}⚠️ PostgreSQL still initializing, continuing...${NC}"
         fi
@@ -218,7 +218,7 @@ else
         fi
         sleep 0.5
     done
-    
+
     if ! docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "SELECT citus_version();" > /dev/null 2>&1; then
         echo -e "${YELLOW}⚠️ Citus still initializing, but continuing...${NC}"
     fi
@@ -242,28 +242,28 @@ if [ $workers_ready -eq 2 ]; then
     echo -e "${GREEN}✅ All workers ready (2/2)${NC}"
 else
     echo -e "${YELLOW}⏳ Waiting for workers to be ready... ($workers_ready/2)${NC}"
-    
+
     # Wait for worker initialization
     for i in {1..30}; do  # 15 second timeout
         worker1_ready=0
         worker2_ready=0
-        
+
         if docker exec "$WORKER1_PRIMARY_CONTAINER" pg_isready -U postgres > /dev/null 2>&1; then
             worker1_ready=1
         fi
         if docker exec "$WORKER2_PRIMARY_CONTAINER" pg_isready -U postgres > /dev/null 2>&1; then
             worker2_ready=1
         fi
-        
+
         workers_ready=$((worker1_ready + worker2_ready))
-        
+
         if [ $workers_ready -eq 2 ]; then
             break
         fi
-        
+
         sleep 0.5
     done
-    
+
     echo -e "${GREEN}✅ Workers ready: $workers_ready/2${NC}"
 fi
 
@@ -273,12 +273,12 @@ log_step "Registering workers in Citus coordinator..."
 # Function to check if a worker is primary (not in recovery)
 is_worker_primary() {
     local worker_container="$1"
-    
+
     # Check if worker is ready first
     if ! docker exec "$worker_container" pg_isready -U postgres > /dev/null 2>&1; then
         return 1
     fi
-    
+
     # Check if worker is NOT in recovery (i.e., it's a primary)
     if docker exec "$worker_container" psql -U postgres -t -c "SELECT pg_is_in_recovery();" 2>/dev/null | grep -q "f"; then
         return 0  # It's a primary
@@ -291,33 +291,33 @@ is_worker_primary() {
 register_worker() {
     local worker_container="$1"
     local worker_name="$2"
-    
+
     log_step "Checking $worker_name..."
-    
+
     # Check if worker is ready
     if ! docker exec "$worker_container" pg_isready -U postgres > /dev/null 2>&1; then
         echo -e "${YELLOW}⚠️ Worker $worker_name not ready, skipping${NC}"
         return 1
     fi
-    
+
     # Check if it's a primary
     if ! is_worker_primary "$worker_container"; then
         echo -e "${BLUE}ℹ️ $worker_name is a replica, skipping registration${NC}"
         return 1
     fi
-    
+
     log_step "Adding $worker_name (primary) to Citus cluster..."
-    
+
     # Get the internal hostname for the worker
     local worker_hostname
     worker_hostname=$(docker exec "$worker_container" hostname 2>/dev/null || echo "$worker_container")
-    
+
     # Check if already registered using hostname
     if docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "SELECT 1 FROM master_get_active_worker_nodes() WHERE node_name = '$worker_hostname';" 2>/dev/null | grep -q "1"; then
         echo -e "${BLUE}ℹ️ Worker $worker_name already registered${NC}"
         return 0
     fi
-    
+
     # Try to register the worker using hostname
     if docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "SELECT master_add_node('$worker_hostname', 5432);" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Worker $worker_name registered successfully${NC}"
@@ -339,7 +339,7 @@ registered_count=0
 for i in "${!ALL_WORKER_CONTAINERS[@]}"; do
     container="${ALL_WORKER_CONTAINERS[$i]}"
     name="${ALL_WORKER_NAMES[$i]}"
-    
+
     if register_worker "$container" "$name"; then
         registered_count=$((registered_count + 1))
     fi
@@ -361,7 +361,7 @@ verify_worker_registration() {
     local worker_container="$1"
     local worker_hostname="$2"
     local worker_name="$3"
-    
+
     # Check if worker is in active worker nodes
     if docker exec "$COORDINATOR_CONTAINER" psql -U postgres -d "$DB_NAME" -c "SELECT 1 FROM master_get_active_worker_nodes() WHERE node_name = '$worker_hostname';" 2>/dev/null | grep -q "1"; then
         # Test connection to worker
@@ -420,7 +420,7 @@ echo -e "${GREEN}╚════════════════════
 echo
 echo -e "${CYAN}🎯 Status: $CLUSTER_STATUS${NC}"
 echo "   • Coordinator Primary: ✅ Running on port 5432"
-echo "   • Coordinator Standby: ✅ Running on port 5434" 
+echo "   • Coordinator Standby: ✅ Running on port 5434"
 echo "   • Worker 1A (Primary): ✅ Running on port 5435"
 echo "   • Worker 1B (Standby): ✅ Running on port 5436"
 echo "   • Worker 2A (Primary): ✅ Running on port 5437"
