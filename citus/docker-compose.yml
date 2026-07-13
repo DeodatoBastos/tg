@@ -23,7 +23,7 @@ services:
     networks:
       - citus_cluster
     ports: 
-      - "5440:5432"
+      - "${VIRTUAL_IP:-127.0.0.1}:5440:5432"
     volumes:
       - citus_coordinator_data:/var/lib/postgresql/data
     environment: &auth
@@ -53,7 +53,7 @@ services:
     networks:
       - citus_cluster
     ports:
-      - "5441:5432"
+      - "${VIRTUAL_IP:-127.0.0.1}:5441:5432"
     volumes:
       - citus_worker1_data:/var/lib/postgresql/data
     environment: *auth
@@ -81,7 +81,7 @@ services:
     networks:
       - citus_cluster
     ports:
-      - "5442:5432"
+      - "${VIRTUAL_IP:-127.0.0.1}:5442:5432"
     volumes:
       - citus_worker2_data:/var/lib/postgresql/data
     environment: *auth
@@ -108,7 +108,7 @@ services:
     networks:
       - citus_cluster
     ports:
-      - "9187:9187"
+      - "${VIRTUAL_IP:-127.0.0.1}:9187:9187"
     environment:
       DATA_SOURCE_NAME: "postgresql://postgres:postgres@coordinator:5432/citus_platform?sslmode=disable"
     depends_on:
@@ -126,7 +126,7 @@ services:
     networks:
       - citus_cluster
     ports:
-      - "9090:9090"
+      - "${VIRTUAL_IP:-127.0.0.1}:9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
@@ -140,7 +140,7 @@ services:
     networks:
       - citus_cluster
     ports:
-      - "3000:3000"
+      - "${VIRTUAL_IP:-127.0.0.1}:3000:3000"
     volumes:
       - citus_grafana_data:/var/lib/grafana
     environment:
