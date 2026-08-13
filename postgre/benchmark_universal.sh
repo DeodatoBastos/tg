@@ -242,7 +242,7 @@ detect_database_type() {
     elif grep -q "postgres:" "$compose_file" || grep -q "image: postgres" "$compose_file"; then
         DB_TYPE="postgresql"
         DBNAME="${POSTGRES_DB:-mydb}"
-        DB_HOST="postgres"
+        DB_HOST="127.0.0.1"
         DB_PORT="5432"
         BENCHMARK_SERVICE="pg_standard"
     else
