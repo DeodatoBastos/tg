@@ -244,7 +244,7 @@ detect_database_type() {
         DBNAME="${POSTGRES_DB:-mydb}"
         DB_HOST="postgres"
         DB_PORT="5432"
-        BENCHMARK_SERVICE="postgres"
+        BENCHMARK_SERVICE="pg_standard"
     else
         log "ERROR" "Tipo de banco não reconhecido no $compose_file"
         exit 1
