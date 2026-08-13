@@ -33,7 +33,7 @@ echo -e "\n\n========================================================="
 echo "📊 INICIANDO CENÁRIO 1: MONOLÍTICO"
 echo "========================================================="
 cleanup
-cd /home/deodato/ita/CSC27/tg/postgre
+cd postgre
 echo "⏳ Subindo contêineres..."
 docker compose up -d
 echo "⏳ Aguardando banco iniciar..."
@@ -49,7 +49,7 @@ echo -e "\n\n========================================================="
 echo "📊 INICIANDO CENÁRIO 2: CITUS SIMPLES"
 echo "========================================================="
 cleanup
-cd /home/deodato/ita/CSC27/tg/citus
+cd ../citus
 echo "⏳ Subindo contêineres..."
 docker compose up -d
 echo "⏳ Aguardando cluster e coordenador..."
@@ -65,7 +65,6 @@ echo -e "\n\n========================================================="
 echo "📊 INICIANDO CENÁRIO 3: CITUS PATRONI (HA)"
 echo "========================================================="
 cleanup
-cd /home/deodato/ita/CSC27/tg/citus
 echo "⏳ Subindo contêineres Patroni..."
 docker compose -f docker-compose-patroni.yml up -d
 echo "⏳ Aguardando Eleição do Patroni (Isso demora mais)..."

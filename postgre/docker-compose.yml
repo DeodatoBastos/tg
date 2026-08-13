@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
       POSTGRES_DB: "${POSTGRES_DB:-mydb}"
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -20,7 +20,7 @@ services:
     environment:
       DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-mydb}?sslmode=disable"
     ports:
-      - "9187:9187"
+      - "19187:9187"
     depends_on:
       - postgres
 
@@ -29,7 +29,7 @@ services:
     image: prom/node-exporter:latest
     container_name: node_exporter
     ports:
-      - "9100:9100"
+      - "19100:9100"
     restart: unless-stopped
     volumes:
       - /proc:/host/proc:ro
@@ -47,7 +47,7 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "19090:9090"
     depends_on:
       - postgres-exporter
 
@@ -56,7 +56,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana_pg
     ports:
-      - "3000:3000"
+      - "13000:3000"
     volumes:
       - grafana-storage:/var/lib/grafana
     depends_on:
