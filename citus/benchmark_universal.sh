@@ -169,7 +169,7 @@ detect_database_type() {
     EFFECTIVE_COMPOSE_CMD="$COMPOSE_CMD"
     
     # Verificar se há containers do Patroni rodando
-    if docker ps --format "{{.Names}}" 2>/dev/null | grep -q "citus_coordinator[0-9]"; then
+    if docker ps --format "{{.Names}}" 2>/dev/null | grep -q "citus_.*coordinator[0-9]"; then
         # Patroni está rodando - usar arquivo patroni
         if [[ -f "docker-compose-patroni.yml" ]]; then
             compose_file="docker-compose-patroni.yml"
