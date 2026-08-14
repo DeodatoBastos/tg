@@ -832,10 +832,6 @@ generate_comparative_report() {
 
             IFS=',' read -ra clients_arr <<< "$CLIENTS_ARRAY"
             for clients in "${clients_arr[@]}"; do
-            if [[ "$suite" == "olap" && "$clients" -gt 4 ]]; then
-                log "INFO" "Skipping OLAP para $clients clients para evitar CPU starvation no Patroni"
-                continue
-            fi
                 echo "├── $clients clients:"
 
                 # Calcular estatísticas
@@ -1087,10 +1083,6 @@ run_benchmark_suite() {
         echo -e "${BOLD}${CYAN}═══════════════════════════════════════════════════════════════${NC}"
 
         for clients in "${clients_arr[@]}"; do
-            if [[ "$suite" == "olap" && "$clients" -gt 4 ]]; then
-                log "INFO" "Skipping OLAP para $clients clients para evitar CPU starvation no Patroni"
-                continue
-            fi
             local jobs=$(( clients / JOBS_RATIO ))
             [[ $jobs -lt 1 ]] && jobs=1
 
