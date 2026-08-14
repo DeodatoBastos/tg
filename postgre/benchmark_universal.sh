@@ -80,6 +80,7 @@ declare -ra BASE_SUITE_DESCRIPTIONS=(
     "TPC-B: Mixed read/write workload (OLTP)"
     "Select-Only: Read-heavy workload (OLAP)"
     "Simple Update: Write-heavy workload"
+    "OLAP (Consultas analíticas pesadas com agregações)"
 )
 
 # Workloads específicos do Citus (removidos para simplificar)
