@@ -523,8 +523,13 @@ initialize_benchmark_data() {
             SELECT create_distributed_table('pgbench_branches', 'bid');  
             SELECT create_distributed_table('pgbench_tellers', 'tid');
             SELECT create_distributed_table('pgbench_history', 'aid');
-        " > "$LOGS_DIR/citus_distribution.log" 2>&1; then
+                " > "$LOGS_DIR/citus_distribution.log" 2>&1; then
             log "ERROR" "Falha na distribuição das tabelas"
+            echo -e "
+[1;31m========== ERRO DETALHADO DA DISTRIBUIÇÃO ==========[0m"
+            cat "$LOGS_DIR/citus_distribution.log"
+            echo -e "[1;31m====================================================[0m
+"
             return 1
         fi
         
