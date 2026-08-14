@@ -549,7 +549,7 @@ get_workload_config() {
             echo "-N"  # Simple update workload
             ;;
         "olap")
-            exec_in_container "$BENCHMARK_SERVICE" sh -c "echo 'SELECT bid, count(aid), sum(abalance), avg(abalance) FROM pgbench_accounts GROUP BY bid ORDER BY bid;' > /tmp/olap.sql"
+            exec_in_container "$BENCHMARK_SERVICE" sh -c "echo 'SELECT bid, count(aid), sum(abalance), avg(abalance) FROM pgbench_accounts WHERE aid < 500000 GROUP BY bid ORDER BY bid;' > /tmp/olap.sql"
             echo "-f /tmp/olap.sql"
             ;;
         "prepared_statements")
@@ -832,6 +832,10 @@ generate_comparative_report() {
 
             IFS=',' read -ra clients_arr <<< "$CLIENTS_ARRAY"
             for clients in "${clients_arr[@]}"; do
+            if [[ "$suite" == "olap" && "$clients" -gt 4 ]]; then
+                log "INFO" "Skipping OLAP para $clients clients para evitar CPU starvation no Patroni"
+                continue
+            fi
                 echo "├── $clients clients:"
 
                 # Calcular estatísticas
@@ -1083,6 +1087,10 @@ run_benchmark_suite() {
         echo -e "${BOLD}${CYAN}═══════════════════════════════════════════════════════════════${NC}"
 
         for clients in "${clients_arr[@]}"; do
+            if [[ "$suite" == "olap" && "$clients" -gt 4 ]]; then
+                log "INFO" "Skipping OLAP para $clients clients para evitar CPU starvation no Patroni"
+                continue
+            fi
             local jobs=$(( clients / JOBS_RATIO ))
             [[ $jobs -lt 1 ]] && jobs=1
 
