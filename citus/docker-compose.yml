@@ -1,32 +1,25 @@
-# Docker Compose for a simple Citus cluster with monitoring and observability
-
 networks:
   citus_cluster:
     name: citus_cluster_simple
     driver: bridge
-
 volumes:
-  citus_coordinator_data:
-  citus_worker1_data:
-  citus_worker2_data:
-  citus_grafana_data:
-
+  citus_coordinator_data: null
+  citus_worker1_data: null
+  citus_worker2_data: null
+  citus_grafana_data: null
 services:
-  # ═══════════════════════════════════════════════════════════════
-  # COORDINATOR 
-  # ═══════════════════════════════════════════════════════════════
   coordinator:
-    image: "citusdata/citus:12.1"
-    container_name: "citus_coordinator"
+    image: citusdata/citus:12.1
+    container_name: citus_coordinator
     hostname: coordinator
     platform: linux/amd64
     networks:
-      - citus_cluster
-    ports: 
-      - "15440:5432"
+    - citus_cluster
+    ports:
+    - 15440:5432
     volumes:
-      - citus_coordinator_data:/var/lib/postgresql/data
-    environment: &auth
+    - citus_coordinator_data:/var/lib/postgresql/data
+    environment: &id001
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: citus_platform
@@ -34,117 +27,112 @@ services:
       PGPASSWORD: postgres
       POSTGRES_HOST_AUTH_METHOD: trust
     labels:
-      - "com.citusdata.role=Coordinator"
-      - "com.citusdata.cluster=citus_simple"
+    - com.citusdata.role=Coordinator
+    - com.citusdata.cluster=citus_simple
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d citus_platform"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d citus_platform
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ═══════════════════════════════════════════════════════════════
-  # 🔧 WORKER 1 
-  # ═══════════════════════════════════════════════════════════════
+    cpus: 2.0
+    mem_limit: 4g
   worker1:
-    image: "citusdata/citus:12.1"
-    container_name: "citus_worker1"
+    image: citusdata/citus:12.1
+    container_name: citus_worker1
     hostname: worker1
     platform: linux/amd64
     networks:
-      - citus_cluster
+    - citus_cluster
     ports:
-      - "15441:5432"
+    - 15441:5432
     volumes:
-      - citus_worker1_data:/var/lib/postgresql/data
-    environment: *auth
+    - citus_worker1_data:/var/lib/postgresql/data
+    environment: *id001
     labels:
-      - "com.citusdata.role=Worker"
-      - "com.citusdata.cluster=citus_simple"
-      - "com.citusdata.group=1"
+    - com.citusdata.role=Worker
+    - com.citusdata.cluster=citus_simple
+    - com.citusdata.group=1
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d citus_platform"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d citus_platform
       interval: 10s
       timeout: 5s
       retries: 5
     depends_on:
       coordinator:
         condition: service_healthy
-
-  # ═══════════════════════════════════════════════════════════════
-  # WORKER 2 
-  # ═══════════════════════════════════════════════════════════════
+    cpus: 2.0
+    mem_limit: 4g
   worker2:
-    image: "citusdata/citus:12.1"
-    container_name: "citus_worker2"
+    image: citusdata/citus:12.1
+    container_name: citus_worker2
     hostname: worker2
     platform: linux/amd64
     networks:
-      - citus_cluster
+    - citus_cluster
     ports:
-      - "15442:5432"
+    - 15442:5432
     volumes:
-      - citus_worker2_data:/var/lib/postgresql/data
-    environment: *auth
+    - citus_worker2_data:/var/lib/postgresql/data
+    environment: *id001
     labels:
-      - "com.citusdata.role=Worker"
-      - "com.citusdata.cluster=citus_simple"
-      - "com.citusdata.group=2"
+    - com.citusdata.role=Worker
+    - com.citusdata.cluster=citus_simple
+    - com.citusdata.group=2
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d citus_platform"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d citus_platform
       interval: 10s
       timeout: 5s
       retries: 5
     depends_on:
       coordinator:
         condition: service_healthy
-
-  # ═══════════════════════════════════════════════════════════════
-  # MONITORING - Prometheus
-  # ═══════════════════════════════════════════════════════════════
+    cpus: 2.0
+    mem_limit: 4g
   postgres-exporter:
-    image: "prometheuscommunity/postgres-exporter:latest"
-    container_name: "citus_postgres_exporter"
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: citus_postgres_exporter
     platform: linux/amd64
     networks:
-      - citus_cluster
+    - citus_cluster
     ports:
-      - "19187:9187"
+    - 19187:9187
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:postgres@coordinator:5432/citus_platform?sslmode=disable"
+      DATA_SOURCE_NAME: postgresql://postgres:postgres@coordinator:5432/citus_platform?sslmode=disable
     depends_on:
       coordinator:
         condition: service_healthy
-
-  # ═══════════════════════════════════════════════════════════════
-  # 📈 OBSERVABILITY - Prometheus + Grafana
-  # ═══════════════════════════════════════════════════════════════
   prometheus:
     image: prom/prometheus:latest
-    container_name: "citus_prometheus"
+    container_name: citus_prometheus
     hostname: prometheus
     platform: linux/amd64
     networks:
-      - citus_cluster
+    - citus_cluster
     ports:
-      - "19090:9090"
+    - 19090:9090
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
-      - postgres-exporter
-
+    - postgres-exporter
   grafana:
     image: grafana/grafana:latest
-    container_name: "citus_grafana"
-    hostname: grafana  
+    container_name: citus_grafana
+    hostname: grafana
     platform: linux/amd64
     networks:
-      - citus_cluster
+    - citus_cluster
     ports:
-      - "13000:3000"
+    - 13000:3000
     volumes:
-      - citus_grafana_data:/var/lib/grafana
+    - citus_grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_DEFAULT_THEME=dark
+    - GF_SECURITY_ADMIN_PASSWORD=admin
+    - GF_USERS_DEFAULT_THEME=dark
     depends_on:
-      - prometheus
+    - prometheus
