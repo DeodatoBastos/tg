@@ -27,19 +27,33 @@ services:
     restart: unless-stopped
     extra_hosts: &id002
     - etcd1:172.28.0.11
+    - citus_etcd1:172.28.0.11
     - etcd2:172.28.0.12
+    - citus_etcd2:172.28.0.12
     - etcd3:172.28.0.13
+    - citus_etcd3:172.28.0.13
     - coordinator1:172.28.0.21
+    - citus_coordinator1:172.28.0.21
     - coordinator2:172.28.0.22
+    - citus_coordinator2:172.28.0.22
     - coordinator3:172.28.0.23
+    - citus_coordinator3:172.28.0.23
     - worker1_primary:172.28.0.31
+    - citus_worker1_primary:172.28.0.31
     - worker1_standby:172.28.0.32
+    - citus_worker1_standby:172.28.0.32
     - worker2_primary:172.28.0.41
+    - citus_worker2_primary:172.28.0.41
     - worker2_standby:172.28.0.42
+    - citus_worker2_standby:172.28.0.42
     - haproxy:172.28.0.50
+    - citus_haproxy:172.28.0.50
     - postgres_exporter:172.28.0.61
+    - citus_postgres_exporter:172.28.0.61
     - prometheus:172.28.0.62
+    - citus_prometheus:172.28.0.62
     - grafana:172.28.0.63
+    - citus_grafana:172.28.0.63
   etcd2:
     image: quay.io/coreos/etcd:v3.5.10
     networks:
