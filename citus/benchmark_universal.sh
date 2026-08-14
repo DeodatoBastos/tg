@@ -79,12 +79,13 @@ EFFECTIVE_COMPOSE_CMD="" # Comando compose com arquivo correto
 # ===================================================================
 
 # Workloads base - iguais para PostgreSQL e Citus (otimizados para rapidez)
-declare -ra BASE_SUITE_NAMES=("tpcb" "select_only" "simple_update")
-declare -ra BASE_SUITE_FLAGS=("" "-S" "-N")
+declare -ra BASE_SUITE_NAMES=("tpcb" "select_only" "simple_update" "olap")
+declare -ra BASE_SUITE_FLAGS=("" "-S" "-N" "-A")
 declare -ra BASE_SUITE_DESCRIPTIONS=(
-    "TPC-B: Mixed read/write workload (OLTP)"
-    "Select-Only: Read-heavy workload (OLAP)" 
-    "Simple Update: Write-heavy workload"
+    "TPC-B (Intenso em escrita/transação)"
+    "Select-Only (Intenso em leitura)"
+    "Simple Update (Escritas pontuais)"
+    "OLAP (Consultas analíticas pesadas com agregações)"
 )
 
 # Workloads específicos do Citus (removidos para simplificar)
@@ -550,8 +551,12 @@ get_workload_config() {
         "select_only") 
             echo "-S"  # Select-only workload
             ;;
-        "simple_update")
+                "simple_update")
             echo "-N"  # Simple update workload
+            ;;
+        "olap")
+            exec_in_container "$BENCHMARK_SERVICE" sh -c "echo 'SELECT bid, count(aid), sum(abalance), avg(abalance) FROM pgbench_accounts GROUP BY bid ORDER BY bid;' > /tmp/olap.sql"
+            echo "-f /tmp/olap.sql"
             ;;
         "prepared_statements")
             echo "-M prepared"  # Prepared statements
