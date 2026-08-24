@@ -1,4 +1,5 @@
-SELECT bid, count(aid), sum(abalance), avg(abalance) 
-FROM pgbench_accounts 
-GROUP BY bid 
-ORDER BY bid;
+SELECT 
+    COUNT(aid) as num_accounts, 
+    SUM(abalance * abalance) as sum_sq, 
+    AVG(SQRT(ABS(abalance) + 1)) as avg_sqrt
+FROM pgbench_accounts;

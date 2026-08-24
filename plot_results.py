@@ -6,13 +6,13 @@ import seaborn as sns
 
 def main():
     sns.set_theme(style="whitegrid")
-    
+
     paths = [
-        "postgre/latest_results_postgresql/reports/benchmark_results.csv",
-        "citus/latest_results_citus/reports/benchmark_results.csv",
-        "citus/latest_results_citus_patroni/reports/benchmark_results.csv"
+        "postgre/benchmark_universal/latest_reports_postgresql/benchmark_results.csv",
+        "citus/benchmark_universal/latest_reports_citus/benchmark_results.csv",
+        "citus/benchmark_universal/latest_reports_citus_patroni/benchmark_results.csv"
     ]
-    
+
     data = []
     for p in paths:
         if os.path.exists(p):
@@ -21,34 +21,34 @@ def main():
             data.append(df)
         else:
             print(f"AVISO: Arquivo não encontrado: {p}")
-            
+
     if not data:
         print("Nenhum arquivo CSV encontrado. Execute os benchmarks primeiro.")
         sys.exit(1)
-        
+
     df_all = pd.concat(data, ignore_index=True)
-    
+
     # Substituir os valores para os nomes mais legíveis nas legendas
     df_all['Database_Type'] = df_all['Database_Type'].replace({
         'postgresql': 'PostgreSQL (Monolito)',
         'citus': 'Citus (Distribuído Simples)',
         'citus_patroni': 'Citus + Patroni (HA)'
     })
-    
+
     palette = sns.color_palette("Set2", len(df_all['Database_Type'].unique()))
     suites = df_all['Suite'].unique()
-    
+
     for suite in suites:
         df_suite = df_all[df_all['Suite'] == suite]
-        
+
         # 1. Gráfico de TPS
         plt.figure(figsize=(10, 6))
         # Passando dados crus, o seaborn barplot calcula média e desenha barra de erro (desvio padrão)
         sns.barplot(
-            data=df_suite, 
-            x="Clients", 
-            y="TPS", 
-            hue="Database_Type", 
+            data=df_suite,
+            x="Clients",
+            y="TPS",
+            hue="Database_Type",
             palette=palette,
             errorbar='sd',
             capsize=.05
@@ -56,21 +56,21 @@ def main():
         plt.title(f"Desempenho TPS - Cenário: {suite.upper()}", fontsize=16, fontweight='bold', pad=20)
         plt.xlabel("Número de Clientes Simultâneos", fontsize=12)
         plt.ylabel("Transações por Segundo (TPS)", fontsize=12)
-        
+
         # Posição da legenda ajustada para não cobrir as barras
         plt.legend(title="Arquitetura", title_fontsize='13', fontsize='11', bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.tight_layout()
         plt.savefig(f"tps_comparative_plot_{suite}.png", dpi=300, bbox_inches='tight')
         print(f"✅ Gráfico gerado: tps_comparative_plot_{suite}.png")
         plt.close()
-        
+
         # 2. Gráfico de Latência
         plt.figure(figsize=(10, 6))
         sns.barplot(
-            data=df_suite, 
-            x="Clients", 
-            y="Latency_Avg_ms", 
-            hue="Database_Type", 
+            data=df_suite,
+            x="Clients",
+            y="Latency_Avg_ms",
+            hue="Database_Type",
             palette=palette,
             errorbar='sd',
             capsize=.05
