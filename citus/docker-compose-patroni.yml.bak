@@ -131,6 +131,8 @@ services:
     - etcd3
     restart: unless-stopped
     extra_hosts: *id002
+    cpus: 2.0
+    mem_limit: 4g
   coordinator2:
     image: citus-patroni:latest
     networks:
@@ -156,6 +158,8 @@ services:
     - etcd3
     restart: unless-stopped
     extra_hosts: *id002
+    cpus: 2.0
+    mem_limit: 4g
   coordinator3:
     image: citus-patroni:latest
     networks:
@@ -181,6 +185,8 @@ services:
     - etcd3
     restart: unless-stopped
     extra_hosts: *id002
+    cpus: 2.0
+    mem_limit: 4g
   worker1_primary:
     image: citus-patroni:latest
     networks:
@@ -206,6 +212,8 @@ services:
     - etcd3
     restart: unless-stopped
     extra_hosts: *id002
+    cpus: 2.0
+    mem_limit: 4g
   worker1_standby:
     image: citus-patroni:latest
     networks:
@@ -231,6 +239,8 @@ services:
     - etcd3
     restart: unless-stopped
     extra_hosts: *id002
+    cpus: 2.0
+    mem_limit: 4g
   worker2_primary:
     image: citus-patroni:latest
     networks:
@@ -256,6 +266,8 @@ services:
     - etcd3
     restart: unless-stopped
     extra_hosts: *id002
+    cpus: 2.0
+    mem_limit: 4g
   worker2_standby:
     image: citus-patroni:latest
     networks:
@@ -281,6 +293,8 @@ services:
     - etcd3
     restart: unless-stopped
     extra_hosts: *id002
+    cpus: 2.0
+    mem_limit: 4g
   postgres_exporter_patroni:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: citus_postgres_exporter_patroni

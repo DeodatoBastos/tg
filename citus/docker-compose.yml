@@ -38,6 +38,7 @@ services:
       retries: 5
     cpus: 2.0
     mem_limit: 4g
+    shm_size: 1g
   worker1:
     image: citusdata/citus:12.1
     container_name: citus_worker1
@@ -66,6 +67,7 @@ services:
         condition: service_healthy
     cpus: 2.0
     mem_limit: 4g
+    shm_size: 1g
   worker2:
     image: citusdata/citus:12.1
     container_name: citus_worker2
@@ -94,6 +96,7 @@ services:
         condition: service_healthy
     cpus: 2.0
     mem_limit: 4g
+    shm_size: 1g
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: citus_postgres_exporter

@@ -550,7 +550,7 @@ get_workload_config() {
             echo "-N"  # Simple update workload
             ;;
         "olap")
-            exec_in_container "$BENCHMARK_SERVICE" sh -c "echo 'SELECT bid, count(aid), sum(abalance), avg(abalance) FROM pgbench_accounts WHERE aid < 500000 GROUP BY bid ORDER BY bid;' > /tmp/olap.sql"
+            exec_in_container "$BENCHMARK_SERVICE" sh -c "echo 'SELECT COUNT(aid) as total, SUM(LENGTH(REGEXP_REPLACE(REPEAT(MD5(abalance::text), 5), \$\$[a-c]\$\$, \$\$X\$\$, \$\$g\$\$))) as complex FROM pgbench_accounts;' > /tmp/olap.sql"
             echo "-f /tmp/olap.sql"
             ;;
         "prepared_statements")
