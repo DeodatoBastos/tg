@@ -36,6 +36,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    command: postgres -c max_connections=500 -c shared_buffers=1GB
     cpus: 2.0
     mem_limit: 4g
     shm_size: 1g
@@ -65,6 +66,7 @@ services:
     depends_on:
       coordinator:
         condition: service_healthy
+    command: postgres -c max_connections=500 -c shared_buffers=1GB
     cpus: 2.0
     mem_limit: 4g
     shm_size: 1g
@@ -94,6 +96,7 @@ services:
     depends_on:
       coordinator:
         condition: service_healthy
+    command: postgres -c max_connections=500 -c shared_buffers=1GB
     cpus: 2.0
     mem_limit: 4g
     shm_size: 1g

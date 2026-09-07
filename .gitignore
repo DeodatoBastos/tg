@@ -213,3 +213,6 @@ citus/benchmark_universal
 comparison_charts/
 
 *.png
+
+scalability_results/
+scalability_results_olap/

@@ -550,7 +550,10 @@ get_workload_config() {
             echo "-N"  # Simple update workload
             ;;
         "olap")
-            exec_in_container "$BENCHMARK_SERVICE" sh -c "echo 'SELECT COUNT(aid) as total, SUM(LENGTH(REGEXP_REPLACE(REPEAT(MD5(abalance::text), 5), \$\$[a-c]\$\$, \$\$X\$\$, \$\$g\$\$))) as complex FROM pgbench_accounts;' > /tmp/olap.sql"
+            # Relatório analítico por filial: full scan + agregação + sort
+            # Sem caracteres especiais — evita problemas de escaping bash
+            # Citus pushdown: cada Worker agrega localmente e envia ~100 rows
+            exec_in_container "$BENCHMARK_SERVICE" sh -c "echo 'SELECT bid, COUNT(aid) as total_contas, SUM(abalance) as saldo_total, AVG(abalance) as saldo_medio, MIN(abalance) as saldo_min, MAX(abalance) as saldo_max FROM pgbench_accounts GROUP BY bid ORDER BY saldo_total DESC;' > /tmp/olap.sql"
             echo "-f /tmp/olap.sql"
             ;;
         "prepared_statements")

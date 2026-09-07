@@ -22,31 +22,31 @@ cleanup() {
     docker volume prune -f >/dev/null 2>&1 || true
 }
 
-# echo -e "\n\n========================================================="
-# echo "📊 INICIANDO CENÁRIO 1: MONOLÍTICO"
-# echo "========================================================="
-# cleanup
-# cd /home/deodato/ita/CSC27/tg/postgre
-# echo "⏳ Subindo contêineres..."
-# docker compose up -d
-# echo "⏳ Aguardando banco iniciar..."
-# sleep 15
-# echo "🔥 Rodando Benchmark (Monolítico)..."
-# ./benchmark_universal.sh
-# echo "✅ Cenário 1 concluído."
+echo -e "\n\n========================================================="
+echo "📊 INICIANDO CENÁRIO 1: MONOLÍTICO"
+echo "========================================================="
+cleanup
+cd /home/deodato/ita/CSC27/tg/postgre
+echo "⏳ Subindo contêineres..."
+docker compose up -d
+echo "⏳ Aguardando banco iniciar..."
+sleep 15
+echo "🔥 Rodando Benchmark (Monolítico)..."
+./benchmark_universal.sh
+echo "✅ Cenário 1 concluído."
 
-# echo -e "\n\n========================================================="
-# echo "📊 INICIANDO CENÁRIO 2: CITUS SIMPLES"
-# echo "========================================================="
-# cleanup
-# cd /home/deodato/ita/CSC27/tg/citus
-# echo "⏳ Subindo contêineres..."
-# docker compose up -d
-# echo "⏳ Aguardando cluster e coordenador..."
-# sleep 20
-# echo "🔥 Rodando Benchmark (Citus Simples)..."
-# ./benchmark_universal.sh citus
-# echo "✅ Cenário 2 concluído."
+echo -e "\n\n========================================================="
+echo "📊 INICIANDO CENÁRIO 2: CITUS SIMPLES"
+echo "========================================================="
+cleanup
+cd /home/deodato/ita/CSC27/tg/citus
+echo "⏳ Subindo contêineres..."
+docker compose up -d
+echo "⏳ Aguardando cluster e coordenador..."
+sleep 20
+echo "🔥 Rodando Benchmark (Citus Simples)..."
+./benchmark_universal.sh citus
+echo "✅ Cenário 2 concluído."
 
 echo -e "\n\n========================================================="
 echo "📊 INICIANDO CENÁRIO 3: CITUS PATRONI (HA)"
