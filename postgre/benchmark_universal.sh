@@ -1054,6 +1054,33 @@ run_benchmark_suite() {
         all_suite_descriptions+=("${CITUS_EXTRA_DESCRIPTIONS[@]}")
     fi
 
+    # Filtrar se SELECTED_SUITES foi especificado
+    if [[ ${#SELECTED_SUITES[@]} -gt 0 ]]; then
+        local filtered_names=()
+        local filtered_descs=()
+        for target in "${SELECTED_SUITES[@]}"; do
+            local found=0
+            for i in "${!all_suite_names[@]}"; do
+                if [[ "${all_suite_names[$i]}" == "$target" ]]; then
+                    filtered_names+=("${all_suite_names[$i]}")
+                    filtered_descs+=("${all_suite_descriptions[$i]}")
+                    found=1
+                    break
+                fi
+            done
+            if [[ "$found" -eq 0 ]]; then
+                log "WARN" "Suite solicitada '$target' é inválida ou não suportada. Ignorando."
+            fi
+        done
+        all_suite_names=("${filtered_names[@]}")
+        all_suite_descriptions=("${filtered_descs[@]}")
+    fi
+    
+    if [[ ${#all_suite_names[@]} -eq 0 ]]; then
+        log "ERROR" "Nenhuma suíte válida selecionada para executar."
+        exit 1
+    fi
+
     local total_tests=0
     local completed_tests=0
     local failed_tests=0
@@ -1153,7 +1180,17 @@ handle_interrupt() {
     cleanup_on_exit
 }
 
+SELECTED_SUITES=()
+
 main() {
+    # Parsear os argumentos (ignorar citus/patroni passados pelo script legacy)
+    for arg in "$@"; do
+        if [[ "$arg" == "citus" || "$arg" == "patroni" ]]; then
+            continue
+        fi
+        SELECTED_SUITES+=("$arg")
+    done
+
     # Configurar tratamento de sinais
     trap handle_interrupt SIGINT SIGTERM
     trap cleanup_on_exit EXIT

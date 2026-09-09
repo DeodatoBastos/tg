@@ -32,7 +32,7 @@ docker compose up -d
 echo "⏳ Aguardando banco iniciar..."
 sleep 15
 echo "🔥 Rodando Benchmark (Monolítico)..."
-./benchmark_universal.sh
+./benchmark_universal.sh "$@"
 echo "✅ Cenário 1 concluído."
 
 echo -e "\n\n========================================================="
@@ -45,7 +45,7 @@ docker compose up -d
 echo "⏳ Aguardando cluster e coordenador..."
 sleep 20
 echo "🔥 Rodando Benchmark (Citus Simples)..."
-./benchmark_universal.sh citus
+./benchmark_universal.sh citus "$@"
 echo "✅ Cenário 2 concluído."
 
 echo -e "\n\n========================================================="
@@ -58,7 +58,7 @@ docker compose -f docker-compose-patroni.yml up -d
 echo "⏳ Aguardando Eleição do Patroni..."
 sleep 45
 echo "🔥 Rodando Benchmark (Citus Patroni)..."
-./benchmark_universal.sh citus patroni
+./benchmark_universal.sh citus patroni "$@"
 echo "✅ Cenário 3 concluído."
 
 cleanup
