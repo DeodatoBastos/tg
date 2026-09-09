@@ -462,13 +462,13 @@ setup_citus_cluster() {
         done
         # Configurar o coordinator explicitamente antes de adicionar workers (previne erro localhost)
         exec_in_container "$BENCHMARK_SERVICE" psql -h "$DB_HOST" -U "$DBUSER" -d "$DBNAME" \
-            -c "SELECT citus_set_coordinator_host('$DB_HOST', 5432);" 2>/dev/null || true
+            -c "SELECT citus_set_coordinator_host('$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_coordinator 2>/dev/null || echo $DB_HOST)', 5432);" 2>/dev/null || true
 
         # Adicionar workers primários ao cluster
         for worker in "${primary_workers[@]}"; do
             log "INFO" "Aguardando worker primário $worker ficar online..."
             for ((i=1; i<=30; i++)); do
-                if exec_in_container "$BENCHMARK_SERVICE" pg_isready -h "$worker" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
+                if exec_in_container "$BENCHMARK_SERVICE" pg_isready -t 2 -h "$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_$worker 2>/dev/null || echo $worker)" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
                     break
                 fi
                 sleep 2
@@ -476,7 +476,7 @@ setup_citus_cluster() {
             
             log "INFO" "Adicionando worker primário: $worker"
             exec_in_container "$BENCHMARK_SERVICE" psql -h "$DB_HOST" -U "$DBUSER" -d "$DBNAME" \
-                -c "SELECT citus_add_node('$worker', 5432);" 2>/dev/null || {
+                -c "SELECT citus_add_node('$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_$worker 2>/dev/null || echo $worker)', 5432);" 2>/dev/null || {
                 log "WARN" "Worker $worker já adicionado ou falha na conexão"
             }
         done
@@ -484,13 +484,13 @@ setup_citus_cluster() {
     else
         # Configurar o coordinator explicitamente antes de adicionar workers
         exec_in_container "$BENCHMARK_SERVICE" psql -h "$DB_HOST" -U "$DBUSER" -d "$DBNAME" \
-            -c "SELECT citus_set_coordinator_host('$DB_HOST', 5432);" 2>/dev/null || true
+            -c "SELECT citus_set_coordinator_host('$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_coordinator 2>/dev/null || echo $DB_HOST)', 5432);" 2>/dev/null || true
 
         # Citus standard - adicionar todos os workers
         for worker in "${WORKER_HOSTS[@]}"; do
             log "INFO" "Aguardando worker $worker ficar online..."
             for ((i=1; i<=30; i++)); do
-                if exec_in_container "$BENCHMARK_SERVICE" pg_isready -h "$worker" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
+                if exec_in_container "$BENCHMARK_SERVICE" pg_isready -t 2 -h "$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_$worker 2>/dev/null || echo $worker)" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
                     break
                 fi
                 sleep 2
@@ -498,7 +498,7 @@ setup_citus_cluster() {
 
             log "INFO" "Adicionando worker: $worker"
             exec_in_container "$BENCHMARK_SERVICE" psql -h "$DB_HOST" -U "$DBUSER" -d "$DBNAME" \
-                -c "SELECT citus_add_node('$worker', 5432);" 2>/dev/null || {
+                -c "SELECT citus_add_node('$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_$worker 2>/dev/null || echo $worker)', 5432);" 2>/dev/null || {
                 log "WARN" "Worker $worker já adicionado ou falha na conexão"
             }
         done
