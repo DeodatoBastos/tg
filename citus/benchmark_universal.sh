@@ -315,10 +315,19 @@ exec_in_container() {
     if $EFFECTIVE_COMPOSE_CMD exec -T -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}" 2>/dev/null; then
         return 0
     else
-        # Fallback para docker exec direto (incluindo PGPASSWORD)
-        log "DEBUG" "Compose falhou, tentando docker exec direto no $service"
-        docker exec -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}"
-        return $?
+        # Tentar descobrir o nome real do container para o fallback
+        local container_name
+        container_name=$($EFFECTIVE_COMPOSE_CMD ps -q "$service" 2>/dev/null || echo "")
+        
+        if [[ -n "$container_name" ]]; then
+            log "DEBUG" "Compose falhou, tentando docker exec direto no container $container_name"
+            docker exec -e PGPASSWORD="$PGPASSWORD" "$container_name" "${cmd[@]}"
+            return $?
+        else
+            # Se não conseguiu resolver, tenta pelo nome original (provavelmente vai falhar)
+            docker exec -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}"
+            return $?
+        fi
     fi
 }
 
@@ -457,6 +466,14 @@ setup_citus_cluster() {
 
         # Adicionar workers primários ao cluster
         for worker in "${primary_workers[@]}"; do
+            log "INFO" "Aguardando worker primário $worker ficar online..."
+            for ((i=1; i<=30; i++)); do
+                if exec_in_container "$BENCHMARK_SERVICE" pg_isready -h "$worker" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 2
+            done
+            
             log "INFO" "Adicionando worker primário: $worker"
             exec_in_container "$BENCHMARK_SERVICE" psql -h "$DB_HOST" -U "$DBUSER" -d "$DBNAME" \
                 -c "SELECT citus_add_node('$worker', 5432);" 2>/dev/null || {
@@ -471,6 +488,14 @@ setup_citus_cluster() {
 
         # Citus standard - adicionar todos os workers
         for worker in "${WORKER_HOSTS[@]}"; do
+            log "INFO" "Aguardando worker $worker ficar online..."
+            for ((i=1; i<=30; i++)); do
+                if exec_in_container "$BENCHMARK_SERVICE" pg_isready -h "$worker" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 2
+            done
+
             log "INFO" "Adicionando worker: $worker"
             exec_in_container "$BENCHMARK_SERVICE" psql -h "$DB_HOST" -U "$DBUSER" -d "$DBNAME" \
                 -c "SELECT citus_add_node('$worker', 5432);" 2>/dev/null || {
@@ -526,7 +551,6 @@ initialize_benchmark_data() {
         # Distribuir as tabelas do pgbench (simples e direto)
         log "INFO" "Distribuindo tabelas pgbench..."
         if ! exec_in_container "$BENCHMARK_SERVICE" psql -h "$DB_HOST" -U "$DBUSER" -d "$DBNAME" -c "
-            SET citus.shard_transfer_mode = 'block_writes';
             SELECT create_distributed_table('pgbench_accounts', 'aid');
             SELECT create_distributed_table('pgbench_branches', 'bid');
             SELECT create_distributed_table('pgbench_tellers', 'tid');
