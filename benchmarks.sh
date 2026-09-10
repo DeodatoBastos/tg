@@ -17,9 +17,26 @@ cleanup() {
     (cd /home/deodato/ita/CSC27/tg/citus && docker compose down -v >/dev/null 2>&1 || true)
     (cd /home/deodato/ita/CSC27/tg/citus && docker compose -f docker-compose-patroni.yml down -v >/dev/null 2>&1 || true)
 
-    # Tiro de misericórdia para garantir
+    # Limpeza absoluta para Docker E Podman
     docker rm -f $(docker ps -aq) >/dev/null 2>&1 || true
+    if command -v podman &> /dev/null; then
+        podman rm -a -f >/dev/null 2>&1 || true
+    fi
+
+    docker network prune -f >/dev/null 2>&1 || true
     docker volume prune -f >/dev/null 2>&1 || true
+    
+    if command -v podman &> /dev/null; then
+        podman network prune -f >/dev/null 2>&1 || true
+    fi
+    
+    # Podman/Docker às vezes segura redes com IPAM estático. Destruir todas as variações de nomes.
+    for net in citus_net citus_citus_net citus_cluster_simple citus_citus_cluster_simple; do
+        docker network rm $net >/dev/null 2>&1 || true
+        if command -v podman &> /dev/null; then
+            podman network rm $net >/dev/null 2>&1 || true
+        fi
+    done
 }
 
 echo -e "\n\n========================================================="

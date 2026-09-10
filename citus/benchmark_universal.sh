@@ -316,15 +316,23 @@ exec_in_container() {
         return 0
     else
         # Tentar descobrir o nome real do container para o fallback
-        local container_name
-        container_name=$($EFFECTIVE_COMPOSE_CMD ps -q "$service" 2>/dev/null || echo "")
+        local container_name=""
+        # 1. Tentar pegar pelo docker ps via regex do nome do serviço
+        container_name=$(docker ps --format '{{.Names}}' | grep -E "(citus_.*${service}$|.*_${service}_.*)" | head -n 1)
+        
+        if [[ -z "$container_name" ]]; then
+            # 2. Se falhar, tenta o nome exato prefixado (comum no compose)
+            if docker ps --format '{{.Names}}' | grep -q "^citus_${service}$"; then
+                container_name="citus_${service}"
+            fi
+        fi
         
         if [[ -n "$container_name" ]]; then
             log "DEBUG" "Compose falhou, tentando docker exec direto no container $container_name"
             docker exec -e PGPASSWORD="$PGPASSWORD" "$container_name" "${cmd[@]}"
             return $?
         else
-            # Se não conseguiu resolver, tenta pelo nome original (provavelmente vai falhar)
+            log "DEBUG" "Não achou o nome real para o serviço $service. Tentando original..."
             docker exec -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}"
             return $?
         fi

@@ -311,9 +311,27 @@ exec_in_container() {
         return 0
     else
         # Fallback para docker exec direto (incluindo PGPASSWORD)
-        log "DEBUG" "Compose falhou, tentando docker exec direto no $service"
-        docker exec -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}"
-        return $?
+        # Tentar descobrir o nome real do container para o fallback
+        local container_name=""
+        # 1. Tentar pegar pelo docker ps via regex do nome do serviço
+        container_name=$(docker ps --format '{{.Names}}' | grep -E "(postgre_.*${service}$|.*_${service}_.*)" | head -n 1)
+        
+        if [[ -z "$container_name" ]]; then
+            # 2. Se falhar, tenta o nome exato prefixado (comum no compose)
+            if docker ps --format '{{.Names}}' | grep -q "^postgre_${service}$"; then
+                container_name="postgre_${service}"
+            fi
+        fi
+        
+        if [[ -n "$container_name" ]]; then
+            log "DEBUG" "Compose falhou, tentando docker exec direto no container $container_name"
+            docker exec -e PGPASSWORD="$PGPASSWORD" "$container_name" "${cmd[@]}"
+            return $?
+        else
+            log "DEBUG" "Não achou o nome real para o serviço $service. Tentando original..."
+            docker exec -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}"
+            return $?
+        fi
     fi
 }
 
