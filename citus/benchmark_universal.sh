@@ -337,7 +337,9 @@ exec_in_container() {
             docker exec -e PGPASSWORD="$PGPASSWORD" "$container_name" "${cmd[@]}"
             return $?
         else
-            log "ERROR" "Container para o serviço $service não encontrado. Ele pode ter morrido durante o teste."
+            log "DEBUG" "Não achou o nome real para o serviço $service. Tentando original..."
+            docker exec -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}"
+            return $?
             return 1
         fi
     fi
