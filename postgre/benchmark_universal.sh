@@ -318,8 +318,13 @@ exec_in_container() {
         
         if [[ -z "$container_name" ]]; then
             # 2. Se falhar, tenta o nome exato prefixado (comum no compose)
-            if docker ps --format '{{.Names}}' | grep -q "^postgre_${service}$"; then
+            if docker ps -a --format '{{.Names}}' | grep -q "^postgre_${service}$"; then
                 container_name="postgre_${service}"
+                # Verifica se ele está morto
+                if ! docker ps --format '{{.Names}}' | grep -q "^postgre_${service}$"; then
+                    log "ERROR" "O container $container_name parece ter morrido (possível OOM / Crash de Memória)."
+                    return 1
+                fi
             fi
         fi
         
@@ -328,9 +333,8 @@ exec_in_container() {
             docker exec -e PGPASSWORD="$PGPASSWORD" "$container_name" "${cmd[@]}"
             return $?
         else
-            log "DEBUG" "Não achou o nome real para o serviço $service. Tentando original..."
-            docker exec -e PGPASSWORD="$PGPASSWORD" "$service" "${cmd[@]}"
-            return $?
+            log "ERROR" "Container para o serviço $service não encontrado. Ele pode ter morrido durante o teste."
+            return 1
         fi
     fi
 }

@@ -55,6 +55,7 @@ EOF
         echo "⏳ Aguardando etcd ficar pronto..."
         sleep 15
         
+        MY_IP=$(hostname -i | awk '{print $1}')
         # Criar configuração Patroni dinamicamente
         cat > /tmp/patroni.yml << EOF
 scope: ${PATRONI_SCOPE:-citus-cluster}
@@ -62,7 +63,7 @@ name: ${PATRONI_NAME}
 
 restapi:
   listen: 0.0.0.0:8008
-  connect_address: ${PATRONI_NAME}:8008
+  connect_address: ${MY_IP}:8008
 
 etcd3:
   hosts: ${PATRONI_ETCD3_HOSTS}
@@ -97,7 +98,7 @@ bootstrap:
 
 postgresql:
   listen: 0.0.0.0:5432
-  connect_address: ${PATRONI_NAME}:5432
+  connect_address: ${MY_IP}:5432
   data_dir: /home/postgres/data
   authentication:
     replication:

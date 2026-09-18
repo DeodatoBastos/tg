@@ -38,10 +38,12 @@ services:
     - citus_coordinator2:172.28.0.22
     - coordinator3:172.28.0.23
     - citus_coordinator3:172.28.0.23
+    - worker1-primary:172.28.0.31
     - worker1_primary:172.28.0.31
     - citus_worker1_primary:172.28.0.31
     - worker1_standby:172.28.0.32
     - citus_worker1_standby:172.28.0.32
+    - worker2-primary:172.28.0.41
     - worker2_primary:172.28.0.41
     - citus_worker2_primary:172.28.0.41
     - worker2_standby:172.28.0.42
@@ -196,7 +198,6 @@ services:
       citus_net:
         ipv4_address: 172.28.0.31
     container_name: citus_worker1_primary
-    hostname: worker1-primary
     environment:
       ETCDCTL_ENDPOINTS: http://etcd1:2379,http://etcd2:2379,http://etcd3:2379
       PATRONI_ETCD3_HOSTS: etcd1:2379,etcd2:2379,etcd3:2379
@@ -204,7 +205,6 @@ services:
       PATRONI_CITUS_DATABASE: citus_platform
       POSTGRES_PASSWORD: postgres
       PGSSLMODE: prefer
-      PATRONI_NAME: worker1-primary
       PATRONI_CITUS_GROUP: 1
     volumes:
     - worker1_primary_data:/home/postgres/data
@@ -252,7 +252,6 @@ services:
       citus_net:
         ipv4_address: 172.28.0.41
     container_name: citus_worker2_primary
-    hostname: worker2-primary
     environment:
       ETCDCTL_ENDPOINTS: http://etcd1:2379,http://etcd2:2379,http://etcd3:2379
       PATRONI_ETCD3_HOSTS: etcd1:2379,etcd2:2379,etcd3:2379
@@ -260,7 +259,6 @@ services:
       PATRONI_CITUS_DATABASE: citus_platform
       POSTGRES_PASSWORD: postgres
       PGSSLMODE: prefer
-      PATRONI_NAME: worker2-primary
       PATRONI_CITUS_GROUP: 2
     volumes:
     - worker2_primary_data:/home/postgres/data
