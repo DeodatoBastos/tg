@@ -406,7 +406,7 @@ check_database_connection() {
         fi
     fi
 
-    local max_attempts=30
+    local max_attempts=120
     local attempt=1
 
     while [[ $attempt -le $max_attempts ]]; do
@@ -424,7 +424,7 @@ check_database_connection() {
         fi
 
         log "INFO" "Tentativa $attempt/$max_attempts - Aguardando $DB_TYPE..."
-        sleep 2
+        sleep 5
         attempt=$((attempt + 1))
     done
 
@@ -483,7 +483,7 @@ setup_citus_cluster() {
                 if exec_in_container "$BENCHMARK_SERVICE" pg_isready -t 2 -h "$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_$worker 2>/dev/null || echo $worker)" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
                     break
                 fi
-                sleep 2
+                sleep 5
             done
             
             log "INFO" "Adicionando worker primário: $worker"
@@ -505,7 +505,7 @@ setup_citus_cluster() {
                 if exec_in_container "$BENCHMARK_SERVICE" pg_isready -t 2 -h "$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' citus_$worker 2>/dev/null || echo $worker)" -p 5432 -U "$DBUSER" >/dev/null 2>&1; then
                     break
                 fi
-                sleep 2
+                sleep 5
             done
 
             log "INFO" "Adicionando worker: $worker"
@@ -1193,7 +1193,7 @@ run_benchmark_suite() {
                     log "ERROR" "Run $run falhou ($progress)"
                 fi
 
-                sleep 2
+                sleep 5
             done
             echo ""
         done
